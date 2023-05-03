@@ -18,10 +18,13 @@ API_KEY = config.api_key
 API_SECRET = config.api_secret
 
 MAX_OFFER_AMOUNT = 1000
-MIN_30D_RATE = 0.0006  # (1 + 0.0006 * 30) ^ (365/30) = 1.24240912469
-MIN_7D_RATE = 0.00035  # (1 + 0.00035 * 7) ^ (365/7) = 1.13609138475
-MIN_4D_6D_RATE = 0.00020  # (1 + 0.0002 * 4) ^ (365/4) = 1.07569914278
-MIN_2D_3D_RATE = 0.00010  # (1 + 0.0001 * 2) ^ (365/2) = 1.03716862664
+MIN_RATE = 0.0001
+MIN_RATE_INCR_PER_DAY = 0.00003
+POSSIBLE_PERIOD = (2, 3, 4, 5, 6, 7, 8, 10, 14, 15, 16, 20, 21, 22, 24, 30)
+
+
+def get_annual_rate(rate, period):
+    return (1 + rate * period) ** (365 / period) - 1
 
 
 @dataclasses.dataclass
@@ -49,7 +52,7 @@ def main():
         execute_funding_task,
         'interval',
         args=[client],
-        seconds=10,
+        minutes=1,
     )
 
     scheduler.add_job(
@@ -106,86 +109,29 @@ async def execute_funding_task(client: bfxapi.Client):
 
 
 async def make_strategy(client: bfxapi.Client):
-    strategy_func_list = [
-        make_30d_strategy,
-        make_7d_strategy,
-        make_4d_to_6d_strategy,
-        make_2d_to_3d_strategy,
-    ]
-    for strategy_func in strategy_func_list:
-        strategy = await strategy_func(client)
-        if strategy:
-            return strategy
+    start = int((dt.datetime.now() - dt.timedelta(minutes=30)).timestamp() * 1000)
+    possible_rates = []
+    for period in POSSIBLE_PERIOD:
+        rate = await get_highest_rate(client, period, '5m', start=start)
+        if rate and rate >= MIN_RATE + (period - 2) * MIN_RATE_INCR_PER_DAY:
+            possible_rates.append((get_annual_rate(rate, period), period, rate))
+    possible_rates.sort(reverse=True)
+    if not possible_rates:
+        print('沒找到最佳利率，掛最低利率')
+        return FundingStrategy(
+            f_type=FundingOffer.Type.LIMIT,
+            rate=MIN_RATE,
+            period=2,
+        )
 
-
-async def make_30d_strategy(client: bfxapi.Client):
-    start = int((dt.datetime.now() - dt.timedelta(minutes=15)).timestamp() * 1000)
-
-    rate = await get_highest_rate(client, 30, '5m', start=start)
-    if rate < MIN_30D_RATE:
-        return None
-
-    return FundingStrategy(
-        f_type=FundingOffer.Type.LIMIT,
-        rate=rate,
-        period=30,
-    )
-
-
-async def make_7d_strategy(client: bfxapi.Client):
-    start = int((dt.datetime.now() - dt.timedelta(minutes=15)).timestamp() * 1000)
-
-    rate = await get_highest_rate(client, 7, '5m', start=start)
-    if rate < MIN_7D_RATE:
-        return None
+    print('從下面可選利率選出第一個為最佳利率')
+    for annual_rate, period, rate in possible_rates:
+        print(f'週期: {period} 利率: {rate} (計算年利率: {annual_rate})')
 
     return FundingStrategy(
         f_type=FundingOffer.Type.LIMIT,
-        rate=rate,
-        period=7,
-    )
-
-
-async def make_4d_to_6d_strategy(client: bfxapi.Client):
-    highest_rate = -1
-    period = None
-    start = int((dt.datetime.now() - dt.timedelta(minutes=15)).timestamp() * 1000)
-
-    for d in [4, 5, 6]:
-        rate = await get_highest_rate(client, d, '5m', start=start)
-        if rate > highest_rate:
-            highest_rate = rate
-            period = d
-
-    if highest_rate < MIN_4D_6D_RATE:
-        return None
-
-    return FundingStrategy(
-        f_type='LIMIT',
-        rate=highest_rate,
-        period=period,
-    )
-
-
-async def make_2d_to_3d_strategy(client: bfxapi.Client):
-    highest_rate = -1
-    period = None
-    start = int((dt.datetime.now() - dt.timedelta(minutes=15)).timestamp() * 1000)
-
-    for d in [2, 3]:
-        rate = await get_highest_rate(client, d, '5m', start=start)
-        if rate > highest_rate:
-            highest_rate = rate
-            period = d
-
-    if highest_rate < MIN_2D_3D_RATE:
-        highest_rate = MIN_2D_3D_RATE
-        period = 2
-
-    return FundingStrategy(
-        f_type='LIMIT',
-        rate=highest_rate,
-        period=period,
+        rate=possible_rates[0][2],
+        period=possible_rates[0][1],
     )
 
 
@@ -195,13 +141,13 @@ async def get_frr_rate(client: bfxapi.Client):
 
 
 async def get_highest_rate(client: bfxapi.Client, period, timeframe, start=None, end=None):
-    highest_rate = -1
+    highest_rate = None
 
     candles = await client.rest.get_public_candles(f'fUSD:p{period}', start=start, end=end, tf=timeframe)
     for candle in candles:
         [mts, open, close, high, low, volume] = candle
         if volume > 0:
-            if high > highest_rate:
+            if highest_rate is None or high > highest_rate:
                 highest_rate = high
     return highest_rate
 

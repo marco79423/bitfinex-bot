@@ -109,7 +109,7 @@ async def execute_funding_task(client: bfxapi.Client):
 
 
 async def make_strategy(client: bfxapi.Client):
-    start = int((dt.datetime.now() - dt.timedelta(minutes=30)).timestamp() * 1000)
+    start = int((dt.datetime.now() - dt.timedelta(hours=1)).timestamp() * 1000)
     possible_rates = []
     for period in POSSIBLE_PERIOD:
         rate = await get_highest_rate(client, period, '5m', start=start)

@@ -21,6 +21,7 @@ MAX_OFFER_AMOUNT = 1000
 MIN_RATE = 0.0001
 MIN_RATE_INCR_PER_DAY = 0.00003
 POSSIBLE_PERIOD = (2, 3, 4, 5, 6, 7, 8, 10, 14, 15, 16, 20, 21, 22, 24, 30)
+FRR_RATIO = 0.1
 
 
 def get_annual_rate(rate, period):
@@ -111,27 +112,36 @@ async def execute_funding_task(client: bfxapi.Client):
 async def make_strategy(client: bfxapi.Client):
     start = int((dt.datetime.now() - dt.timedelta(hours=1)).timestamp() * 1000)
     possible_rates = []
+
+    # 找出最小可接受利率
+    min_rate = await get_highest_rate(client, 2, '5m', start=start)
+    if not min_rate or min_rate < MIN_RATE:
+        min_rate = MIN_RATE
+
     for period in POSSIBLE_PERIOD:
         rate = await get_highest_rate(client, period, '5m', start=start)
-        if rate and rate >= MIN_RATE + (period - 2) * MIN_RATE_INCR_PER_DAY:
+        if rate and rate >= min_rate + (period - 2) * MIN_RATE_INCR_PER_DAY:
             possible_rates.append((get_annual_rate(rate, period), period, rate))
-    possible_rates.sort(reverse=True)
+
     if not possible_rates:
-        print('沒找到最佳利率，掛最低利率')
+        # print('沒找到最佳利率，掛最低利率')
         return FundingStrategy(
             f_type=FundingOffer.Type.LIMIT,
-            rate=MIN_RATE,
+            rate=min_rate,
             period=2,
         )
 
-    print('從下面可選利率選出第一個為最佳利率')
-    for annual_rate, period, rate in possible_rates:
-        print(f'週期: {period} 利率: {rate} (計算年利率: {annual_rate})')
+    possible_rates.sort(reverse=True)
+    _, acceptable_period, acceptable_rate = possible_rates[0]
+
+    # print('從下面可選利率選出第一個為最佳利率')
+    # for annual_rate, period, rate in possible_rates:
+    #     print(f'週期: {period} 利率: {rate} (計算年利率: {annual_rate})')
 
     return FundingStrategy(
         f_type=FundingOffer.Type.LIMIT,
-        rate=possible_rates[0][2],
-        period=possible_rates[0][1],
+        rate=acceptable_rate,
+        period=acceptable_period,
     )
 
 

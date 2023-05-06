@@ -78,7 +78,7 @@ async def execute_funding_task(client: bfxapi.Client):
 
         if not strategy.is_used_by(offer):
             await client.rest.submit_cancel_funding_offer(offer.id)
-            print(f'[{dt.datetime.now()}] 取消訂單 <{offer}>')
+            print(f'[{dt.datetime.now()}] 取消訂單 {offer}')
 
     # 如果錢包有錢但是小於 150，取消金額最小的訂單
     balance_available = await get_funding_balance(client)
@@ -95,7 +95,7 @@ async def execute_funding_task(client: bfxapi.Client):
 
         if min_amount_offer:
             await client.rest.submit_cancel_funding_offer(min_amount_offer.id)
-            print(f'[{dt.datetime.now()}] 取消訂單 <{min_amount_offer}>')
+            print(f'[{dt.datetime.now()}] 取消訂單 {min_amount_offer}')
 
     # 根據當前餘額和策略下訂單
     balance_available = await get_funding_balance(client)

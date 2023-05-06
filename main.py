@@ -73,6 +73,9 @@ async def execute_funding_task(client: bfxapi.Client):
     # 取消所有不同策略的訂單
     offers = await client.rest.get_funding_offers(symbol='fUSD')
     for offer in offers:
+        if offer.f_type == FundingOffer.Type.FRR_DELTA:
+            continue
+
         if not strategy.is_used_by(offer):
             await client.rest.submit_cancel_funding_offer(offer.id)
             print(f'[{dt.datetime.now()}] 取消訂單 <{offer}>')
@@ -84,6 +87,9 @@ async def execute_funding_task(client: bfxapi.Client):
 
         min_amount_offer = None
         for offer in offers:
+            if offer.f_type == FundingOffer.Type.FRR_DELTA:
+                continue
+
             if min_amount_offer is None or offer.amount < min_amount_offer.amount:
                 min_amount_offer = offer
 

@@ -17,6 +17,8 @@ config = OmegaConf.load(CONFIG_FILE_PATH)
 API_KEY = config.api_key
 API_SECRET = config.api_secret
 
+BITFINEX_FEES = 0.15
+
 MAX_OFFER_AMOUNT = 1000
 MIN_RATE = 0.0001
 MIN_RATE_INCR_PER_DAY = 0.00003
@@ -192,7 +194,8 @@ async def show_stats(client: bfxapi.Client):
         total_amount += credit.amount
         total_earn += credit.rate * credit.amount
     average_rate = total_earn / total_amount
-    print(f'[{dt.datetime.now()}] 總借出: {total_amount} 每日收益: {total_earn} (平均利率: {average_rate * 100}%)')
+    final_earn = total_earn * (1 - BITFINEX_FEES)
+    print(f'[{dt.datetime.now()}] 總借出: {total_amount} 每日收益: {final_earn} (平均利率: {average_rate * 100}%)')
 
 
 if __name__ == '__main__':

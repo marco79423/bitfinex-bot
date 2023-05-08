@@ -177,6 +177,13 @@ async def get_funding_balance(client: bfxapi.Client):
             return wallet.balance_available
 
 
+async def get_total_asset(client: bfxapi.Client):
+    wallets = await client.rest.get_wallets()
+    for wallet in wallets:
+        if wallet.type == 'funding' and wallet.currency == 'USD':
+            return wallet.balance
+
+
 async def get_min_amount_offer(client: bfxapi.Client):
     offers = await client.rest.get_funding_offers(symbol='fUSD')
 

@@ -202,7 +202,7 @@ async def show_stats(client: bfxapi.Client):
         total_earn += credit.rate * credit.amount
     average_rate = total_earn / total_amount
     final_earn = total_earn * (1 - BITFINEX_FEES)
-    print(f'[{dt.datetime.now()}] 總借出: {total_amount} 每日收益: {final_earn} (平均利率: {average_rate * 100}%)')
+    print(f'[{dt.datetime.now()}] 總借出: {total_amount} 每日收益: {final_earn} (平均利率: {average_rate})')
 
 
 if __name__ == '__main__':

@@ -23,7 +23,6 @@ MAX_OFFER_AMOUNT = 1000
 MIN_RATE = 0.0001
 MIN_RATE_INCR_PER_DAY = 0.00003
 POSSIBLE_PERIOD = (2, 3, 4, 5, 6, 7, 8, 10, 14, 15, 16, 20, 21, 22, 24, 30)
-FRR_RATIO = 0.1
 
 
 def get_annual_rate(rate, period):
@@ -98,6 +97,22 @@ async def execute_funding_task(client: bfxapi.Client):
         if min_amount_offer:
             await client.rest.submit_cancel_funding_offer(min_amount_offer.id)
             print(f'[{dt.datetime.now()}] 取消訂單 {min_amount_offer}')
+
+    # 如果沒有 FRR 訂單，就下一個
+    balance_available = await get_funding_balance(client)
+    if balance_available >= 150 and not await has_frr_offer(client):
+        amount = balance_available
+        if amount > MAX_OFFER_AMOUNT:
+            amount = MAX_OFFER_AMOUNT
+
+        resp = await client.rest.submit_funding_offer(
+            symbol='fUSD',
+            amount=amount,
+            rate=0,
+            period=120,
+            funding_type=FundingOffer.Type.FRR_DELTA
+        )
+        print(f'[{dt.datetime.now()}] 新增 FRR 訂單 {resp.notify_info})')
 
     # 根據當前餘額和策略下訂單
     balance_available = await get_funding_balance(client)
@@ -175,6 +190,14 @@ async def get_funding_balance(client: bfxapi.Client):
     for wallet in wallets:
         if wallet.type == 'funding' and wallet.currency == 'USD':
             return wallet.balance_available
+
+
+async def has_frr_offer(client: bfxapi.Client):
+    offers = await client.rest.get_funding_offers(symbol='fUSD')
+    for offer in offers:
+        if offer.f_type == FundingOffer.Type.FRR_DELTA:
+            return True
+    return False
 
 
 async def get_total_asset(client: bfxapi.Client):

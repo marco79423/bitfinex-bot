@@ -218,23 +218,23 @@ async def get_min_amount_offer(client: bfxapi.Client):
 
 
 async def show_stats(client: bfxapi.Client):
+    frr_rate = await get_frr_rate(client=client)
+
     total_amount = 0
     total_earn = 0
     for credit in await client.rest.get_funding_credits(symbol='fUSD'):
-        if credit.rate == 0:
-            continue
+        rate = credit.rate
+
+        # 如果 rate = 0 就當 FRR
+        if rate == 0:
+            rate = frr_rate
+
         total_amount += credit.amount
-        total_earn += credit.rate * credit.amount
+        total_earn += rate * credit.amount
+
     average_rate = total_earn / total_amount
     final_earn = total_earn * (1 - BITFINEX_FEES)
-    print(f'[{dt.datetime.now()}][非 FRR] 總借出: {total_amount} 每日收益: {final_earn} (平均利率: {average_rate})')
-
-    total_amount = 0
-    for credit in await client.rest.get_funding_credits(symbol='fUSD'):
-        if credit.rate == 0:
-            total_amount += credit.amount
-    print(f'[{dt.datetime.now()}][FRR] 總借出: {total_amount}')
-
+    print(f'[{dt.datetime.now()}] 總借出: {total_amount} 每日收益: {final_earn} (平均利率: {average_rate})')
 
 
 if __name__ == '__main__':

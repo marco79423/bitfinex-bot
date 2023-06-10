@@ -109,7 +109,7 @@ async def execute_funding_task(client: bfxapi.Client):
             symbol='fUSD',
             amount=amount,
             rate=0,
-            period=120,
+            period=30,
             funding_type=FundingOffer.Type.FRR_DELTA
         )
         print(f'[{dt.datetime.now()}] 新增 FRR 訂單 {resp.notify_info})')
